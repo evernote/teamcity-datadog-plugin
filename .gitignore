@@ -1,4 +1,7 @@
+# Build results
 **/target/
-.idea/
-**/*.iml
+/server/
 
+# Project files
+/.idea/
+**/*.iml

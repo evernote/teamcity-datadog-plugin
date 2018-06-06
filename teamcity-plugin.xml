@@ -2,15 +2,16 @@
 <teamcity-plugin xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:schemas-jetbrains-com:teamcity-plugin-v1-xml">
   <info>
     <name>teamcity-datadog-plugin</name>
-    <display-name>teamcity-datadog-plugin</display-name>
+    <display-name>DataDog integration</display-name>
     <version>@Version@</version>
-    <description>Plugin description</description>
-    <download-url>Plugin download URL</download-url>
-    <email>Plugin author e-mail</email>
+    <description>Export build results and statistics into DataDog</description>
+    <download-url>
+      https://stash.ba1.etonreve.com/users/tbasanov/repos/teamcity-datadog-plugin/browse?at=refs%2Fheads%2Fdevel
+    </download-url>
+    <email>tbasanov@evernote.com</email>
     <vendor>
       <name>@VendorName@</name>
       <url>@VendorURL@</url>
-      <logo>Plugin vendor logo URL</logo>
     </vendor>
   </info>
   <deployment use-separate-classloader="true" />
