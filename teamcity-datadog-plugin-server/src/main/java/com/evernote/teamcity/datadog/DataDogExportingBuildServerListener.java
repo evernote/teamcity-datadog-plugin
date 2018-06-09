@@ -131,7 +131,8 @@ public class DataDogExportingBuildServerListener extends BuildServerAdapter {
           TimeUnit.SECONDS.toMillis(build.getDuration()), tags);
 
       // Gradually build event text and tags
-      final StringBuilder eventText = new StringBuilder();
+      // https://docs.datadoghq.com/graphing/event_stream/#markdown-events
+      final StringBuilder eventText = new StringBuilder("%%% \n");
       final List<String> eventTags = Lists.newArrayList(tags);
 
       eventText.append(String.format(
@@ -165,9 +166,9 @@ public class DataDogExportingBuildServerListener extends BuildServerAdapter {
         eventText.append("Source code VCS roots:\n```\n");
         for (BuildRevision buildRevision : build.getRevisions()) {
           eventText.append(String.format("VCS root: %s   Revision: %s\n",
-              buildRevision.getRoot().getVcsDisplayName(),
+              buildRevision.getRoot().getName(),
               buildRevision.getRevisionDisplayName()));
-          eventTags.add("vcs_root:" + buildRevision.getRoot().getName());
+          eventTags.add("vcs_root:" + buildRevision.getRoot().getDescription());
           eventTags.add("vcs_revision:" + buildRevision.getRevision());
         }
         eventText.append("```\n");
@@ -184,14 +185,18 @@ public class DataDogExportingBuildServerListener extends BuildServerAdapter {
       eventText.append(String.format("Generated: %s build logs\n",
           build.getBuildLog().getSizeEstimate()));
 
-      eventText.append("Generated build artifacts:\n```\n");
       final long[] totalArtifactsSize = {0};
+      final long[] totalArtifactsCount = {0};
       build.getArtifacts(BuildArtifactsViewMode.VIEW_DEFAULT).iterateArtifacts(
           new BuildArtifacts.BuildArtifactsProcessor() {
             @NotNull @Override public Continuation processBuildArtifact(
                 @NotNull BuildArtifact artifact) {
               if (!artifact.getName().isEmpty() && !artifact.isContainer()) {
+                if (totalArtifactsCount[0] == 0) {
+                  eventText.append("Generated build artifacts:\n```\n");
+                }
                 totalArtifactsSize[0] += artifact.getSize();
+                totalArtifactsCount[0] += 1;
                 eventText.append(String.format("%s (%s)\n",
                     artifact.getRelativePath(),
                     FileUtils.byteCountToDisplaySize(artifact.getSize())));
@@ -200,9 +205,15 @@ public class DataDogExportingBuildServerListener extends BuildServerAdapter {
               return Continuation.CONTINUE;
             }
           });
-      eventText.append(String.format("```\nTotal artifacts size: %s\n",
-          FileUtils.byteCountToDisplaySize(totalArtifactsSize[0])));
+      if (totalArtifactsCount[0] != 0) {
+        eventText.append(String.format("```\nTotal %s artifacts size: %s\n",
+            totalArtifactsCount[0],
+            FileUtils.byteCountToDisplaySize(totalArtifactsSize[0])));
+      } else {
+        eventText.append("No build artifacts generated\n");
+      }
 
+      eventText.append("\n %%%");
       statsDClient.recordEvent(
           Event.builder()
               .withTitle(String.format("TeamCity finished a build [%s]", statusTag))
