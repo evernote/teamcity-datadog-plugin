@@ -28,12 +28,17 @@ import jetbrains.buildServer.log.Loggers;
 import jetbrains.buildServer.serverSide.BuildRevision;
 import jetbrains.buildServer.serverSide.BuildServerAdapter;
 import jetbrains.buildServer.serverSide.BuildServerListener;
+import jetbrains.buildServer.serverSide.BuildStatistics;
+import jetbrains.buildServer.serverSide.BuildStatisticsOptions;
+import jetbrains.buildServer.serverSide.CompilationBlockBean;
 import jetbrains.buildServer.serverSide.SBuildFeatureDescriptor;
 import jetbrains.buildServer.serverSide.SRunningBuild;
+import jetbrains.buildServer.serverSide.STestRun;
 import jetbrains.buildServer.serverSide.ServerSettings;
 import jetbrains.buildServer.serverSide.artifacts.BuildArtifact;
 import jetbrains.buildServer.serverSide.artifacts.BuildArtifacts;
 import jetbrains.buildServer.serverSide.artifacts.BuildArtifactsViewMode;
+import jetbrains.buildServer.tests.TestName;
 import jetbrains.buildServer.util.EventDispatcher;
 import jetbrains.buildServer.web.openapi.PluginDescriptor;
 
@@ -73,6 +78,10 @@ public class DataDogExportingBuildServerListener extends BuildServerAdapter {
     buildServerListenerEventDispatcher.addListener(this);
   }
 
+  @Override public void buildStarted(@NotNull SRunningBuild build) {
+    buildEventHappened(build);
+  }
+  
   @Override public void buildFinished(@NotNull SRunningBuild build) {
     buildEventHappened(build);
   }
@@ -98,11 +107,13 @@ public class DataDogExportingBuildServerListener extends BuildServerAdapter {
   private void exportBuildEventToDataDog(
       StatsDClient statsDClient, SRunningBuild build) {
     try {
-      if (build.isPersonal() || !build.isFinished()) {
+      if (build.isPersonal()) {
         // skipping all personal builds
         return;
       }
 
+      BuildStatistics buildStatistics = build.getBuildStatistics(
+          BuildStatisticsOptions.ALL_TESTS_NO_DETAILS);
       boolean buildSuccess = build.getFailureReasons().isEmpty()
           && !build.isInterrupted() && build.isFinished();
       String branchTag = build.getBranch() != null ? build.getBranch().getName() : "N/A";
@@ -121,14 +132,41 @@ public class DataDogExportingBuildServerListener extends BuildServerAdapter {
           "build_status:" + statusTag,
       };
 
-      statsDClient.count("teamcity.build.finished_count", 1, tags);
-      if (buildSuccess) {
-        statsDClient.count("teamcity.build.success_count", 1, tags);
+      if (build.isFinished()) {
+        statsDClient.count("teamcity.build.finished_count", 1, tags);
+        if (buildSuccess) {
+          statsDClient.count("teamcity.build.success_count", 1, tags);
+        } else {
+          statsDClient.count("teamcity.build.failed_count", 1, tags);
+        }
+
+        statsDClient.time("teamcity.build.duration",
+            TimeUnit.SECONDS.toMillis(build.getDuration()), tags);
+        statsDClient.histogram("teamcity.build.compilation_error_count",
+            TimeUnit.SECONDS.toMillis(
+                buildStatistics.getCompilationErrorsCount()), tags);
+
+        statsDClient.histogram("teamcity.build.tests.run_count",
+            TimeUnit.SECONDS.toMillis(
+                buildStatistics.getAllTestRunCount()), tags);
+        statsDClient.histogram("teamcity.build.tests.failed_count",
+            TimeUnit.SECONDS.toMillis(
+                buildStatistics.getFailedTestCount()), tags);
+        statsDClient.histogram("teamcity.build.tests.all_count",
+            TimeUnit.SECONDS.toMillis(
+                buildStatistics.getAllTestCount()), tags);
+        statsDClient.histogram("teamcity.build.tests.ignored_count",
+            TimeUnit.SECONDS.toMillis(
+                buildStatistics.getIgnoredTestCount()), tags);
+        statsDClient.histogram("teamcity.build.tests.new_failed_count",
+            TimeUnit.SECONDS.toMillis(
+                buildStatistics.getNewFailedCount()), tags);
+        statsDClient.histogram("teamcity.build.tests.passed_count",
+            TimeUnit.SECONDS.toMillis(
+                buildStatistics.getPassedTestCount()), tags);
       } else {
-        statsDClient.count("teamcity.build.failed_count", 1, tags);
+        statsDClient.count("teamcity.build.started_count", 1, tags);
       }
-      statsDClient.time("teamcity.build.duration",
-          TimeUnit.SECONDS.toMillis(build.getDuration()), tags);
 
       // Gradually build event text and tags
       // https://docs.datadoghq.com/graphing/event_stream/#markdown-events
@@ -136,9 +174,15 @@ public class DataDogExportingBuildServerListener extends BuildServerAdapter {
       final List<String> eventTags = Lists.newArrayList(tags);
 
       eventText.append(String.format(
-          "TeamCity finished a build [%s #%s](%s/viewLog.html?buildId=%s)\n",
+          "TeamCity %s a build [%s #%s](%s/viewLog.html?buildId=%s)\n",
+          build.isFinished() ? "finished" : "started",
           build.getFullName(), build.getBuildNumber(),
           serverSettings.getRootUrl(), build.getBuildId()));
+      if (build.isFinished()) {
+        eventTags.add("build_finished");
+      } else {
+        eventTags.add("build_started");
+      }
       eventTags.add("build_number:" + build.getRawBuildNumber());
       eventTags.add("build_id:" + build.getBuildId());
 
@@ -150,8 +194,30 @@ public class DataDogExportingBuildServerListener extends BuildServerAdapter {
           eventTags.add("build_failure_reason:" + buildProblemData.getType());
         }
         eventText.append("```\n");
+
+        if (buildStatistics.getCompilationErrorsCount() > 0) {
+          CompilationBlockBean compilationBlockBean =
+              buildStatistics.getCompilationErrorBlocks().get(0);
+          eventText.append(String.format("Compilation error(s) %d. Example: `%s`\n",
+              buildStatistics.getCompilationErrorsCount(),
+              compilationBlockBean.getCompilerMessages()));
+          eventTags.add("compilation_error_example:"
+              + compilationBlockBean.getCompilerMessages());
+        }
+        if (buildStatistics.getFailedTestCount() > 0) {
+          STestRun sTestRun = buildStatistics.getFailedTests().get(0);
+          TestName testName = sTestRun.getTest().getName();
+          eventText.append(String.format(
+              "Failed test(s) %d (%d new) from %d, Example: `%s`\n",
+              buildStatistics.getFailedTestCount(),
+              buildStatistics.getNewFailedCount(),
+              buildStatistics.getAllTestCount(),
+              testName.getAsString()));
+          eventTags.add("failed_test_example:" + testName.getShortName());
+        }
       } else {
         eventText.append("Build was successful!\n");
+        eventTags.add("build_success");
       }
       eventTags.add("build_internal_status:" + build.getBuildStatus());
 
