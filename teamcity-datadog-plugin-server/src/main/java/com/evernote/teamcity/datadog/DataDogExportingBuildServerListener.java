@@ -142,6 +142,10 @@ public class DataDogExportingBuildServerListener extends BuildServerAdapter {
 
         statsDClient.time("teamcity.build.duration",
             TimeUnit.SECONDS.toMillis(build.getDuration()), tags);
+        statsDClient.histogram("teamcity.build.log_size",
+            TimeUnit.SECONDS.toMillis(
+                build.getBuildLog().getSizeEstimateAsLong()), tags);
+
         statsDClient.histogram("teamcity.build.compilation_error_count",
             TimeUnit.SECONDS.toMillis(
                 buildStatistics.getCompilationErrorsCount()), tags);
@@ -186,44 +190,6 @@ public class DataDogExportingBuildServerListener extends BuildServerAdapter {
       eventTags.add("build_number:" + build.getRawBuildNumber());
       eventTags.add("build_id:" + build.getBuildId());
 
-      if (!build.getFailureReasons().isEmpty()) {
-        eventText.append("Build failures:\n```\n");
-        for (BuildProblemData buildProblemData : build.getFailureReasons()) {
-          eventText.append(String.format("%s\n",
-              buildProblemData.getDescription()));
-          eventTags.add("build_failure_reason:" + buildProblemData.getType());
-        }
-        eventText.append("```\n");
-
-        if (buildStatistics.getCompilationErrorsCount() > 0) {
-          CompilationBlockBean compilationBlockBean =
-              buildStatistics.getCompilationErrorBlocks().get(0);
-          eventText.append(String.format("Compilation error(s) %d. Example: `%s`\n",
-              buildStatistics.getCompilationErrorsCount(),
-              compilationBlockBean.getCompilerMessages()));
-          eventTags.add("compilation_error_example:"
-              + compilationBlockBean.getCompilerMessages());
-        }
-        if (buildStatistics.getFailedTestCount() > 0) {
-          STestRun sTestRun = buildStatistics.getFailedTests().get(0);
-          TestName testName = sTestRun.getTest().getName();
-          eventText.append(String.format(
-              "Failed test(s) %d (%d new) from %d, Example: `%s`\n",
-              buildStatistics.getFailedTestCount(),
-              buildStatistics.getNewFailedCount(),
-              buildStatistics.getAllTestCount(),
-              testName.getAsString()));
-          eventTags.add("failed_test_example:" + testName.getShortName());
-        }
-      } else {
-        eventText.append("Build was successful!\n");
-        eventTags.add("build_success");
-      }
-      eventTags.add("build_internal_status:" + build.getBuildStatus());
-
-      eventText.append(String.format("Build length: %s\n",
-          Period.seconds((int) build.getDuration()).toString(PeriodFormat.getDefault())));
-
       eventText.append(String.format("Triggered by: %s\n",
           build.getTriggeredBy().getAsString()));
       eventTags.add("build_triggered_by:" + build.getTriggeredBy().getRawTriggeredBy());
@@ -248,35 +214,76 @@ public class DataDogExportingBuildServerListener extends BuildServerAdapter {
       eventTags.add("build_agent_ip_address:" + build.getAgent().getHostAddress());
       eventTags.add("build_agent_hostname:" + build.getAgent().getHostName());
 
-      eventText.append(String.format("Generated: %s build logs\n",
-          build.getBuildLog().getSizeEstimate()));
+      if (build.isFinished()) {
+        if (!build.getFailureReasons().isEmpty()) {
+          eventText.append("Build failures:\n```\n");
+          for (BuildProblemData buildProblemData : build.getFailureReasons()) {
+            eventText.append(String.format("%s\n",
+                buildProblemData.getDescription()));
+            eventTags.add("build_failure_reason:" + buildProblemData.getType());
+          }
+          eventText.append("```\n");
 
-      final long[] totalArtifactsSize = {0};
-      final long[] totalArtifactsCount = {0};
-      build.getArtifacts(BuildArtifactsViewMode.VIEW_DEFAULT).iterateArtifacts(
-          new BuildArtifacts.BuildArtifactsProcessor() {
-            @NotNull @Override public Continuation processBuildArtifact(
-                @NotNull BuildArtifact artifact) {
-              if (!artifact.getName().isEmpty() && !artifact.isContainer()) {
-                if (totalArtifactsCount[0] == 0) {
-                  eventText.append("Generated build artifacts:\n```\n");
+          if (buildStatistics.getCompilationErrorsCount() > 0) {
+            CompilationBlockBean compilationBlockBean =
+                buildStatistics.getCompilationErrorBlocks().get(0);
+            eventText.append(String.format("Compilation error(s) %d. Example: `%s`\n",
+                buildStatistics.getCompilationErrorsCount(),
+                compilationBlockBean.getCompilerMessages()));
+            eventTags.add("compilation_error_example:"
+                + compilationBlockBean.getCompilerMessages());
+          }
+          if (buildStatistics.getFailedTestCount() > 0) {
+            STestRun sTestRun = buildStatistics.getFailedTests().get(0);
+            TestName testName = sTestRun.getTest().getName();
+            eventText.append(String.format(
+                "Failed test(s) %d (%d new) from %d, Example: `%s`\n",
+                buildStatistics.getFailedTestCount(),
+                buildStatistics.getNewFailedCount(),
+                buildStatistics.getAllTestCount(),
+                testName.getAsString()));
+            eventTags.add("failed_test_example:" + testName.getShortName());
+          }
+        } else {
+          eventText.append("Build was successful!\n");
+          eventTags.add("build_success");
+        }
+        eventTags.add("build_internal_status:" + build.getBuildStatus());
+
+        eventText.append(String.format("Build length: %s\n",
+            Period.seconds((int) build.getDuration())
+                .toString(PeriodFormat.getDefault())));
+
+        eventText.append(String.format("Generated: %s build logs\n",
+            build.getBuildLog().getSizeEstimate()));
+
+        final long[] totalArtifactsSize = {0};
+        final long[] totalArtifactsCount = {0};
+        build.getArtifacts(BuildArtifactsViewMode.VIEW_DEFAULT).iterateArtifacts(
+            new BuildArtifacts.BuildArtifactsProcessor() {
+              @NotNull @Override public Continuation processBuildArtifact(
+                  @NotNull BuildArtifact artifact) {
+                if (!artifact.getName().isEmpty() && !artifact.isContainer()) {
+                  if (totalArtifactsCount[0] == 0) {
+                    eventText.append("Generated build artifacts:\n```\n");
+                  }
+                  totalArtifactsSize[0] += artifact.getSize();
+                  totalArtifactsCount[0] += 1;
+                  eventText.append(String.format("%s (%s)\n",
+                      artifact.getRelativePath(),
+                      FileUtils.byteCountToDisplaySize(artifact.getSize())));
+                  eventTags.add("build_artifact:" + artifact.getRelativePath());
                 }
-                totalArtifactsSize[0] += artifact.getSize();
-                totalArtifactsCount[0] += 1;
-                eventText.append(String.format("%s (%s)\n",
-                    artifact.getRelativePath(),
-                    FileUtils.byteCountToDisplaySize(artifact.getSize())));
-                eventTags.add("build_artifact:" + artifact.getRelativePath());
+                return Continuation.CONTINUE;
               }
-              return Continuation.CONTINUE;
-            }
-          });
-      if (totalArtifactsCount[0] != 0) {
-        eventText.append(String.format("```\nTotal %s artifacts size: %s\n",
-            totalArtifactsCount[0],
-            FileUtils.byteCountToDisplaySize(totalArtifactsSize[0])));
-      } else {
-        eventText.append("No build artifacts generated\n");
+            });
+        if (totalArtifactsCount[0] != 0) {
+          eventText.append(String.format("```\nTotal %s artifacts size: %s\n",
+              totalArtifactsCount[0],
+              FileUtils.byteCountToDisplaySize(totalArtifactsSize[0])));
+        } else {
+          eventText.append("No build artifacts generated\n");
+        }
       }
 
       eventText.append("\n %%%");
