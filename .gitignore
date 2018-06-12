@@ -1,6 +1,6 @@
 # Build results
 **/target/
-/server/
+/servers/
 
 # Project files
 /.idea/
