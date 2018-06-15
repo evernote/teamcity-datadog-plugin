@@ -174,11 +174,16 @@ public class DataDogExportingBuildServerListener extends BuildServerAdapter {
 
       // Gradually build event text and tags
       // https://docs.datadoghq.com/graphing/event_stream/#markdown-events
+      final String eventTitle;
       final StringBuilder eventText = new StringBuilder("%%% \n");
       final List<String> eventTags = Lists.newArrayList(tags);
 
+      eventTitle = String.format(
+          "TeamCity build %s: %s #%s",
+          statusTag,
+          build.getFullName(), build.getBuildNumber());
       eventText.append(String.format(
-          "TeamCity %s a build [%s #%s](%s/viewLog.html?buildId=%s)\n",
+          "TeamCity build %s: [%s #%s](%s/viewLog.html?buildId=%s)\n",
           build.isFinished() ? "finished" : "started",
           build.getFullName(), build.getBuildNumber(),
           serverSettings.getRootUrl(), build.getBuildId()));
@@ -187,7 +192,7 @@ public class DataDogExportingBuildServerListener extends BuildServerAdapter {
       } else {
         eventTags.add("build_started");
       }
-      eventTags.add("build_number:" + build.getRawBuildNumber());
+      eventTags.add("build_number:" + build.getBuildNumber());
       eventTags.add("build_id:" + build.getBuildId());
 
       eventText.append(String.format("Triggered by: %s\n",
@@ -224,15 +229,6 @@ public class DataDogExportingBuildServerListener extends BuildServerAdapter {
           }
           eventText.append("```\n");
 
-          if (buildStatistics.getCompilationErrorsCount() > 0) {
-            CompilationBlockBean compilationBlockBean =
-                buildStatistics.getCompilationErrorBlocks().get(0);
-            eventText.append(String.format("Compilation error(s) %d. Example: `%s`\n",
-                buildStatistics.getCompilationErrorsCount(),
-                compilationBlockBean.getCompilerMessages()));
-            eventTags.add("compilation_error_example:"
-                + compilationBlockBean.getCompilerMessages());
-          }
           if (buildStatistics.getFailedTestCount() > 0) {
             STestRun sTestRun = buildStatistics.getFailedTests().get(0);
             TestName testName = sTestRun.getTest().getName();
@@ -289,7 +285,7 @@ public class DataDogExportingBuildServerListener extends BuildServerAdapter {
       eventText.append("\n %%%");
       statsDClient.recordEvent(
           Event.builder()
-              .withTitle(String.format("TeamCity finished a build [%s]", statusTag))
+              .withTitle(eventTitle)
               .withText(eventText.toString())
               .withHostname(build.getAgent().getHostName())
               .build(),
