@@ -89,3 +89,9 @@ All other files are wrappers to configure TeamCity to handle this plugin.
 
 See [TeamCity SDK Maven plugin](https://github.com/JetBrains/teamcity-sdk-maven-plugin)
 for more instructions.
+
+## Releasing a new version
+
+```bash
+mvn release:prepare release:clean --batch-mode
+```
