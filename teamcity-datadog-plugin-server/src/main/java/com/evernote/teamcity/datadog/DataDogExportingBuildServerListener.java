@@ -30,7 +30,6 @@ import jetbrains.buildServer.serverSide.BuildServerAdapter;
 import jetbrains.buildServer.serverSide.BuildServerListener;
 import jetbrains.buildServer.serverSide.BuildStatistics;
 import jetbrains.buildServer.serverSide.BuildStatisticsOptions;
-import jetbrains.buildServer.serverSide.CompilationBlockBean;
 import jetbrains.buildServer.serverSide.SBuildFeatureDescriptor;
 import jetbrains.buildServer.serverSide.SRunningBuild;
 import jetbrains.buildServer.serverSide.STestRun;
@@ -143,31 +142,23 @@ public class DataDogExportingBuildServerListener extends BuildServerAdapter {
         statsDClient.time("teamcity.build.duration",
             TimeUnit.SECONDS.toMillis(build.getDuration()), tags);
         statsDClient.histogram("teamcity.build.log_size",
-            TimeUnit.SECONDS.toMillis(
-                build.getBuildLog().getSizeEstimateAsLong()), tags);
+            build.getBuildLog().getSizeEstimateAsLong(), tags);
 
         statsDClient.histogram("teamcity.build.compilation_error_count",
-            TimeUnit.SECONDS.toMillis(
-                buildStatistics.getCompilationErrorsCount()), tags);
+            buildStatistics.getCompilationErrorsCount(), tags);
 
         statsDClient.histogram("teamcity.build.tests.run_count",
-            TimeUnit.SECONDS.toMillis(
-                buildStatistics.getAllTestRunCount()), tags);
+            buildStatistics.getAllTestRunCount(), tags);
         statsDClient.histogram("teamcity.build.tests.failed_count",
-            TimeUnit.SECONDS.toMillis(
-                buildStatistics.getFailedTestCount()), tags);
+            buildStatistics.getFailedTestCount(), tags);
         statsDClient.histogram("teamcity.build.tests.all_count",
-            TimeUnit.SECONDS.toMillis(
-                buildStatistics.getAllTestCount()), tags);
+            buildStatistics.getAllTestCount(), tags);
         statsDClient.histogram("teamcity.build.tests.ignored_count",
-            TimeUnit.SECONDS.toMillis(
-                buildStatistics.getIgnoredTestCount()), tags);
+            buildStatistics.getIgnoredTestCount(), tags);
         statsDClient.histogram("teamcity.build.tests.new_failed_count",
-            TimeUnit.SECONDS.toMillis(
-                buildStatistics.getNewFailedCount()), tags);
+            buildStatistics.getNewFailedCount(), tags);
         statsDClient.histogram("teamcity.build.tests.passed_count",
-            TimeUnit.SECONDS.toMillis(
-                buildStatistics.getPassedTestCount()), tags);
+            buildStatistics.getPassedTestCount(), tags);
       } else {
         statsDClient.count("teamcity.build.started_count", 1, tags);
       }
