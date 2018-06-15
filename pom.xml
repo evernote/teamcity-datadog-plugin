@@ -21,6 +21,9 @@
           <url>http://repository.jetbrains.com/all</url>
       </pluginRepository>
   </pluginRepositories>
+  <scm>
+    <developerConnection>scm:git:.</developerConnection>
+  </scm>
   <build>
       <pluginManagement>
           <plugins>
