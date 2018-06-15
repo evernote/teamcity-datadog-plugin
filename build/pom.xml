@@ -4,7 +4,7 @@
   <parent>
     <artifactId>teamcity-datadog-plugin</artifactId>
     <groupId>com.evernote</groupId>
-    <version>1.0</version>
+    <version>1.1-SNAPSHOT</version>
   </parent>
   <artifactId>build</artifactId>
   <packaging>pom</packaging>
@@ -23,7 +23,7 @@
     <dependency>
       <groupId>com.evernote</groupId>
       <artifactId>teamcity-datadog-plugin-server</artifactId>
-      <version>1.0</version>
+      <version>1.1-SNAPSHOT</version>
     </dependency>
   </dependencies>
   <build>
