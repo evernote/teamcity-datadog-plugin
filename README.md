@@ -93,5 +93,11 @@ for more instructions.
 ## Releasing a new version
 
 ```bash
+git checkout devel
 mvn release:prepare release:clean --batch-mode
+git checkout master
+git merge teamcity-datadog-plugin-1.XXX # where X is the current version 
+git push
+git checkout devel
+git push
 ```
