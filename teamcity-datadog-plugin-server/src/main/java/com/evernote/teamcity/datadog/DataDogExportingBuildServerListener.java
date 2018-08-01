@@ -168,6 +168,14 @@ public class DataDogExportingBuildServerListener extends BuildServerAdapter {
       final String eventTitle;
       final StringBuilder eventText = new StringBuilder("%%% \n");
       final List<String> eventTags = Lists.newArrayList(tags);
+      final Event.AlertType alertType =
+          !build.isFinished()
+              ? Event.AlertType.INFO // do not highlight started builds
+              : build.isInterrupted()
+                  ? Event.AlertType.WARNING // highlight cancelled builds with yellow
+                  : build.getFailureReasons().isEmpty()
+                      ? Event.AlertType.SUCCESS // highlight successful builds with green
+                      : Event.AlertType.ERROR; // highlight failed builds with red
 
       eventTitle = String.format(
           "TeamCity build %s: %s #%s",
@@ -274,11 +282,18 @@ public class DataDogExportingBuildServerListener extends BuildServerAdapter {
       }
 
       eventText.append("\n %%%");
+      // see https://docs.datadoghq.com/api/?lang=python#events
       statsDClient.recordEvent(
           Event.builder()
               .withTitle(eventTitle)
               .withText(eventText.toString())
               .withHostname(build.getAgent().getHostName())
+              .withAlertType(alertType)
+              // https://docs.datadoghq.com/integrations/faq/list-of-api-source-attribute-value/
+              .withSourceTypeName("TEAMCITY")
+              // group all builds for the same branch into one stream
+              .withAggregationKey(String.format("%s:%s",
+                  build.getBuildTypeExternalId(), branchTag))
               .build(),
           eventTags.toArray(new String[0]));
     } catch (RuntimeException e) {
