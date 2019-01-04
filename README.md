@@ -1,12 +1,12 @@
-# TeamCity DataDog Exporter Build Feature
-Add a "DataDog Export" build feature, which adds DataDog integration to your builds.
+# TeamCity Datadog Exporter Build Feature
+Add a "Datadog Export" build feature, which adds Datadog integration to your builds.
 
-There is only one configuration field: DataDog build agent url/port.
+There is only one configuration field: Datadog build agent url/port.
 By default `localhost:8125` is used.
 
-We use DataDog Java API version 2.5.
+We use Datadog Java API version 2.5.
 
-## DataDog metrics exported
+## Datadog metrics exported
 Started builds:
  - `teamcity.build.started_count`: to count builds started
 
@@ -50,7 +50,7 @@ All metrics share the same set of tags:
 `build_internal_status:normal`
 `build_artifact:teamcity-datadog-plugin_zip`
 
-TeamCity build finished: [Test Project :: DataDog Exporter Plugin #6](http://localhost:8111/viewLog.html?buildId=13)\
+TeamCity build finished: [Test Project :: Datadog Exporter Plugin #6](http://localhost:8111/viewLog.html?buildId=13)\
 Triggered by: Super user\
 Source code VCS roots:
 ```
@@ -83,8 +83,8 @@ Connect a Java remote debugger to localhost:10111.
 IntelliJ would automatically reload classes on recompilation if possible when 
 a remote debugger is attached. It's possible to reload JSP without restarting TeamCity.
 
-DataDog exporting code is located in just one class:
-[DataDogExportingBuildServerListener](./teamcity-datadog-plugin-server/src/main/java/com/evernote/teamcity/datadog/DataDogExportingBuildServerListener.java) 
+Datadog exporting code is located in just one class:
+[DatadogExportingBuildServerListener](./teamcity-datadog-plugin-server/src/main/java/com/evernote/teamcity/datadog/DatadogExportingBuildServerListener.java) 
 All other files are wrappers to configure TeamCity to handle this plugin. 
 
 See [TeamCity SDK Maven plugin](https://github.com/JetBrains/teamcity-sdk-maven-plugin)
