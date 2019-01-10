@@ -6,7 +6,7 @@
     <version>@Version@</version>
     <description>Export build results and statistics into DataDog</description>
     <download-url>
-      https://stash.ba1.etonreve.com/users/tbasanov/repos/teamcity-datadog-plugin/browse?at=refs%2Fheads%2Fmaster
+      https://github.com/evernote/teamcity-datadog-plugin
     </download-url>
     <email>tbasanov@evernote.com</email>
     <vendor>
