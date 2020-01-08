@@ -29,9 +29,9 @@ All metrics share the same set of tags:
  - `build_branch`: build branch (human-readable name)
  - `build_status`: one of `started`, `interrupted`, `success` or `failed`  
 
-## DataDog events: build started and build finished
+## Datadog events: build started and build finished
 
-**TeamCity build success: Test Project :: DataDog Exporter Plugin #6**
+**TeamCity build success: Test Project :: Datadog Exporter Plugin #6**
  
 `build_project_id:testproject`
 `build_type_id:testproject_datadogexporterplugin`
